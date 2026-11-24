@@ -246,6 +246,19 @@ def game_markets(sim, disp, margin):
     return pd.DataFrame(rows)
 
 
+def reorder_by_moves(current_order, old_rank, new_rank):
+    """Depth-chart 'move' semantics. current_order: uids top->bottom. old_rank/new_rank: {uid: rank}.
+    Each player whose rank was edited is moved to that position (others shift by one); untouched players keep
+    their relative order. Several moves are applied from the top rank down. Returns the new uid order."""
+    order = list(current_order)
+    moved = sorted((u for u in order if int(new_rank[u]) != int(old_rank[u])), key=lambda u: int(new_rank[u]))
+    for u in moved:
+        order.remove(u)
+    for u in moved:
+        order.insert(max(0, min(int(new_rank[u]) - 1, len(order))), u)
+    return order
+
+
 def fig_layout(fig, height, title=None, legend_below=False, **kw):
     """Consistent Plotly layout with margins sized for the title and legend (nothing clipped)."""
     fig.update_layout(height=height, title=dict(text=title, x=0, xanchor="left", font=dict(size=14)) if title else None,

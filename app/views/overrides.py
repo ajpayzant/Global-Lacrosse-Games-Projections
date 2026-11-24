@@ -62,7 +62,7 @@ tbl = pd.DataFrame({
     "Set A/gm": [po.get(u, {}).get("a_rate") for u in pp.player_uid],
     "Used G/gm": pp.talent_g, "Goal share": pp.share_g, "Assist share": pp.share_a})
 ed_p = st.data_editor(
-    tbl, hide_index=True, width="stretch", key=f"pe_{nat}",
+    tbl, hide_index=True, width="stretch", key=f"pe_{nat}_{abs(hash(str(sorted(po.items())))) % 10**8}",
     disabled=["player_uid", "Player", "Pos", "Source", "Model G/gm", "Model A/gm", "Used G/gm", "Goal share", "Assist share"],
     column_config={"player_uid": None,
                    "Model G/gm": st.column_config.NumberColumn(format="%.2f"), "Model A/gm": st.column_config.NumberColumn(format="%.2f"),

@@ -33,6 +33,8 @@ field = field.sort_values("depth_rank").reset_index(drop=True)
 ov = C.E.load_overrides()
 edited = team in ov.get("depth", {})
 st.markdown(f"**{team} depth chart** — " + ("edited (saved)" if edited else "model default (data only)"))
+st.caption("To move a player, type his new rank and click Save: he takes that spot and everyone between shifts by one. "
+           "Rank 11 sits by default (12-man game roster).")
 c1, c2 = st.columns([1.45, 1])
 with c1:
     tbl = pd.DataFrame({
@@ -43,10 +45,13 @@ with c1:
         "Usage override": [ov.get("usage", {}).get(u) for u in field.player_uid],
         "Proj goal share": field.share_g, "Proj assist share": field.share_a})
     ed = st.data_editor(
-        tbl, hide_index=True, width="stretch", height=470, key=f"depth_{team}",
+        tbl, hide_index=True, width="stretch", height=470,
+        # key changes whenever the saved order changes, so stale row edits are never replayed onto re-sorted rows
+        key=f"depth_{team}_{abs(hash(tuple(tbl.player_uid))) % 10**8}_{abs(hash(str(ov.get('usage', {})))) % 10**6}",
         disabled=[c for c in tbl.columns if c not in ("Depth rank", "Usage override")],
         column_config={"player_uid": None,
-                       "Depth rank": st.column_config.NumberColumn(min_value=1, max_value=len(tbl), step=1, help="Edit to re-order; ties broken by model rank"),
+                       "Depth rank": st.column_config.NumberColumn(min_value=1, max_value=len(tbl), step=1,
+                                                                   help="Type the new position: the player moves there and the others shift"),
                        "Exp. usage": st.column_config.NumberColumn(format="percent"),
                        "Usage override": st.column_config.NumberColumn("Usage override (share)", format="percent", min_value=0.0, max_value=0.35,
                                                                        step=0.005, help="Optional: your expected share of team usage, e.g. 0.07 = 7%. Blank = model."),
@@ -60,7 +65,9 @@ with c1:
                        "Proj assist share": st.column_config.NumberColumn(format="percent")})
     b1, b2, _ = st.columns([1, 1, 2])
     if b1.button("💾 Save depth chart", type="primary"):
-        order = ed.sort_values(["Depth rank", "Model rank"]).player_uid.tolist()
+        cur = tbl.player_uid.tolist()                                   # table is shown in current depth order
+        order = C.reorder_by_moves(cur, dict(zip(tbl.player_uid, tbl["Depth rank"])),
+                                   dict(zip(ed.player_uid, ed["Depth rank"].fillna(tbl["Depth rank"]))))
         default = tbl.sort_values("Model rank").player_uid.tolist()
         ov.setdefault("usage", {})
         for r in ed.to_dict("records"):
