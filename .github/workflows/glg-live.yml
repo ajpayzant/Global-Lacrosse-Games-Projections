@@ -1,0 +1,48 @@
+name: GLG results update
+
+# After games: scrape completed Global Lacrosse Games results + player box scores from the PLL stats API and
+# merge them into the app's saved data (the private Gist), so projections for upcoming games update.
+#   - automatic: once a night after the day's games (05:00 UTC = midnight ET), Dec 9-14
+#   - manual:    Actions tab -> "GLG results update" -> Run workflow
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   PLL_BEARER_TOKEN   PLL stats API token
+#   GLG_GIST_ID        id of the private Gist the app saves to
+#   GLG_GITHUB_TOKEN   token with the "gist" scope
+on:
+  schedule:
+    - cron: '0 5 9-14 12 *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: glg-results
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLL_BEARER_TOKEN: ${{ secrets.PLL_BEARER_TOKEN }}
+      GLG_GIST_ID: ${{ secrets.GLG_GIST_ID }}
+      GLG_GITHUB_TOKEN: ${{ secrets.GLG_GITHUB_TOKEN }}
+      GLG_LIVE_DIR: glg_live
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests pandas duckdb
+      - name: Check secrets
+        run: |
+          missing=""
+          [ -z "$PLL_BEARER_TOKEN" ] && missing="$missing PLL_BEARER_TOKEN"
+          [ -z "$GLG_GIST_ID" ] && missing="$missing GLG_GIST_ID"
+          [ -z "$GLG_GITHUB_TOKEN" ] && missing="$missing GLG_GITHUB_TOKEN"
+          if [ -n "$missing" ]; then echo "::error::Missing repository secrets:$missing"; exit 1; fi
+      - name: Scrape PLL stats API
+        run: python scripts/scrape_glg_live.py
+      - name: Merge into the app's saved data (Gist)
+        run: python glg/live_sync.py glg_live
